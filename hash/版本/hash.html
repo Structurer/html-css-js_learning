@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>本地哈希计算工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #f5f5f5;
+        }
+        .container {
+            gap: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .title {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .section {
+            background: #fff;
+            padding: 18px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section h3 {
+            color: #444;
+            margin-bottom: 12px;
+            font-size: 16px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+        /* 文本输入区 */
+        #textInput {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            font-size: 14px;
+        }
+        /* 算法选择区 */
+        .algo-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        .algo-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 14px;
+        }
+        /* 拖拽区 */
+        .drag-area {
+            width: 100%;
+            height: 160px;
+            border: 2px dashed #ccc;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .drag-area.active {
+            border-color: #2196F3;
+            background: #f0f8ff;
+            color: #2196F3;
+        }
+        .drag-area p {
+            text-align: center;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        /* 输出区 */
+        #resultOutput {
+            width: 100%;
+            height: 300px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            font-size: 13px;
+            line-height: 1.4;
+            background: #fafafa;
+            white-space: pre-wrap;
+            overflow-y: auto;
+        }
+        /* 按钮区 */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #2196F3;
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        button.clear {
+            background: #f44336;
+        }
+        button.clear:hover {
+            background: #d32f2f;
+        }
+        button.copy {
+            background: #4CAF50;
+        }
+        button.copy:hover {
+            background: #388E3C;
+        }
+        /* 加载提示 */
+        .loading {
+            color: #2196F3;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="title">本地哈希计算工具（文件/文件夹/文本）</h2>
+
+        <!-- 1. 文本输入区 -->
+        <div class="section">
+            <h3>一、 文本哈希输入</h3>
+            <textarea id="textInput" placeholder="输入任意文字，可计算对应哈希值..."></textarea>
+        </div>
+
+        <!-- 2. 哈希算法选择区 -->
+        <div class="section">
+            <h3>二、 选择哈希算法（支持多选）</h3>
+            <div class="algo-group">
+                <!-- 常用算法 -->
+                <label class="algo-item"><input type="checkbox" name="algo" value="MD5" checked> MD5</label>
+                <label class="algo-item"><input type="checkbox" name="algo" value="SHA-1"> SHA-1</label>
+                <label class="algo-item"><input type="checkbox" name="algo" value="SHA-256" checked> SHA-256</label>
+                <label class="algo-item"><input type="checkbox" name="algo" value="SHA-384"> SHA-384</label>
+                <label class="algo-item"><input type="checkbox" name="algo" value="SHA-512" checked> SHA-512</label>
+                <!-- 小众SHA3系列算法 -->
+                <label class="algo-item"><input type="checkbox" name="algo" value="SHA-3-256"> SHA-3-256</label>
+                <label class="algo-item"><input type="checkbox" name="algo" value="SHA-3-384"> SHA-3-384</label>
+                <label class="algo-item"><input type="checkbox" name="algo" value="SHA-3-512"> SHA-3-512</label>
+            </div>
+        </div>
+
+        <!-- 3. 拖拽文件/文件夹区 -->
+        <div class="section">
+            <h3>三、 拖拽文件/文件夹（支持多文件/递归文件夹）</h3>
+            <div id="dragArea" class="drag-area">
+                <p>🖱️ 拖拽文件/文件夹到此处</p>
+                <p>支持单文件/多文件/整个文件夹，文件夹自动递归遍历所有子文件</p>
+            </div>
+        </div>
+
+        <!-- 4. 操作按钮+加载提示 -->
+        <div class="btn-group">
+            <button id="calcBtn">开始计算哈希</button>
+            <button id="copyBtn" class="copy">复制全部结果</button>
+            <button id="clearBtn" class="clear">清空所有内容</button>
+        </div>
+        <div class="loading" id="loading">计算中... 大文件/文件夹请稍候</div>
+
+        <!-- 5. 结果输出区 -->
+        <div class="section">
+            <h3>四、 哈希计算结果（本地计算，无文件上传）</h3>
+            <textarea id="resultOutput" readonly placeholder="计算结果将展示在这里..."></textarea>
+        </div>
+    </div>
+
+    <script>
+        // 全局DOM获取
+        const textInput = document.getElementById('textInput');
+        const dragArea = document.getElementById('dragArea');
+        const resultOutput = document.getElementById('resultOutput');
+        const calcBtn = document.getElementById('calcBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const loading = document.getElementById('loading');
+        const algoCheckboxes = document.querySelectorAll('input[name="algo"]');
+
+        // 存储拖拽的文件列表（完整路径+文件对象）
+        let fileList = [];
+
+        // ========== 核心工具函数 ==========
+        // 1. ArrayBuffer转十六进制字符串（所有算法通用）
+        function arrayBufferToHex(buffer) {
+            return Array.from(new Uint8Array(buffer))
+                .map(byte => byte.toString(16).padStart(2, '0'))
+                .join('');
+        }
+
+        // 2. 获取选中的哈希算法
+        function getSelectedAlgos() {
+            return Array.from(algoCheckboxes).filter(box => box.checked).map(box => box.value);
+        }
+
+        // 3. 通用哈希计算函数（文本/文件通用）
+        async function calculateHash(data, algo) {
+            try {
+                const buffer = await window.crypto.subtle.digest(algo, data);
+                return arrayBufferToHex(buffer);
+            } catch (e) {
+                return `算法${algo}计算失败：${e.message}`;
+            }
+        }
+
+        // ========== 文本哈希计算 ==========
+        async function calcTextHash(text) {
+            if (!text.trim()) return '';
+            const algos = getSelectedAlgos();
+            if (algos.length === 0) return '请至少选择一种哈希算法！';
+            
+            const encoder = new TextEncoder();
+            const data = encoder.encode(text.trim());
+            let result = `【文本哈希】输入内容：${text.trim()}\n`;
+            
+            for (const algo of algos) {
+                const hash = await calculateHash(data, algo);
+                result += `└── ${algo}：${hash}\n`;
+            }
+            return result + '\n';
+        }
+
+        // ========== 文件/文件夹处理 ==========
+        // 1. 递归遍历文件夹，获取所有文件（含子文件夹）
+        async function traverseFolder(entry, path = '') {
+            const fullPath = path ? `${path}/${entry.name}` : entry.name;
+            if (entry.isFile) {
+                return new Promise(resolve => {
+                    entry.file(file => {
+                        fileList.push({ path: fullPath, file });
+                        resolve();
+                    });
+                });
+            } else if (entry.isDirectory) {
+                const reader = entry.createReader();
+                return new Promise(resolve => {
+                    const readEntries = () => {
+                        reader.readEntries(entries => {
+                            if (entries.length === 0) {
+                                resolve();
+                                return;
+                            }
+                            Promise.all(entries.map(e => traverseFolder(e, fullPath))).then(readEntries);
+                        });
+                    };
+                    readEntries();
+                });
+            }
+        }
+
+        // 2. 计算单个文件哈希
+        async function calcFileHash(fileItem) {
+            const { path, file } = fileItem;
+            const algos = getSelectedAlgos();
+            let result = `【文件哈希】完整路径：${path}\n`;
+            
+            const reader = new FileReader();
+            return new Promise(resolve => {
+                reader.onload = async () => {
+                    const data = reader.result;
+                    for (const algo of algos) {
+                        const hash = await calculateHash(data, algo);
+                        result += `└── ${algo}：${hash}\n`;
+                    }
+                    resolve(result + '\n');
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // 3. 批量计算文件哈希（含文件夹递归）
+        async function calcFilesHash() {
+            if (fileList.length === 0) return '';
+            let result = `【批量文件哈希】共${fileList.length}个文件\n`;
+            for (const fileItem of fileList) {
+                result += await calcFileHash(fileItem);
+            }
+            return result;
+        }
+
+        // ========== 拖拽功能实现 ==========
+        // 拖拽悬浮
+        dragArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dragArea.classList.add('active');
+        });
+        // 拖拽离开
+        dragArea.addEventListener('dragleave', () => {
+            dragArea.classList.remove('active');
+        });
+        // 拖拽放下
+        dragArea.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dragArea.classList.remove('active');
+            fileList = []; // 清空旧文件列表
+
+            const items = e.dataTransfer.items;
+            if (!items.length) return;
+
+            // 解析拖拽的文件/文件夹
+            for (const item of items) {
+                const entry = item.webkitGetAsEntry();
+                if (entry) await traverseFolder(entry);
+            }
+
+            // 提示拖拽结果
+            if (fileList.length > 0) {
+                resultOutput.value += `已成功识别：${fileList.length}个文件（含递归文件夹内文件）\n\n`;
+            }
+        });
+
+        // ========== 按钮点击事件 ==========
+        // 开始计算
+        calcBtn.addEventListener('click', async () => {
+            loading.style.display = 'block';
+            resultOutput.value = '';
+            let finalResult = '';
+
+            // 1. 计算文本哈希（有输入才计算）
+            if (textInput.value.trim()) {
+                finalResult += await calcTextHash(textInput.value);
+            }
+
+            // 2. 计算文件哈希（有文件才计算）
+            if (fileList.length > 0) {
+                finalResult += await calcFilesHash();
+            }
+
+            // 无输入提示
+            if (!finalResult) {
+                finalResult = '请输入文本 或 拖拽文件/文件夹后再计算！';
+            }
+
+            resultOutput.value = finalResult;
+            loading.style.display = 'none';
+        });
+
+        // 复制结果
+        copyBtn.addEventListener('click', async () => {
+            if (!resultOutput.value.trim()) return;
+            await navigator.clipboard.writeText(resultOutput.value);
+            alert('结果已成功复制到剪贴板！');
+        });
+
+        // 清空所有
+        clearBtn.addEventListener('click', () => {
+            textInput.value = '';
+            resultOutput.value = '';
+            fileList = [];
+            algoCheckboxes.forEach(box => box.checked = box.value === 'MD5' || box.value === 'SHA-256' || box.value === 'SHA-512');
+        });
+    </script>
+</body>
+</html>

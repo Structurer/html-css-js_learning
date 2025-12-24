@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>本地哈希计算工具（全算法精简版）</title>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
+    <style>
+        * {margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif;}
+        body {padding:20px;max-width:1400px;margin:0 auto;background:#f5f5f5;}
+        .container {gap:20px;display:flex;flex-direction:column;}
+        .title {text-align:center;color:#333;margin-bottom:10px;}
+        /* 左右并列布局核心 - 不变 */
+        .row-box {display:flex;gap:20px;width:100%;}
+        .col-box {flex:1;min-width:300px;}
+        /* 🔥 修复高度溢出核心：父容器弹性布局，内部自适应，无固定高度 */
+        .section {
+            background:#fff;padding:18px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);
+            display: flex;flex-direction: column;/* 内部纵向弹性，自适应高度 */
+        }
+        .section h3 {color:#444;margin-bottom:12px;font-size:16px;border-bottom:1px solid #eee;padding-bottom:8px;}
+        /* 🔥 修复1：文本框自适应父容器，不溢出，仅设最小高度 */
+        #textInput {
+            width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;resize:vertical;font-size:14px;
+            flex:1;/* 自适应父容器剩余高度 */
+            min-height:120px;/* 最小高度保证美观，可手动拉伸 */
+        }
+        /* 🔥 修复2：拖拽框自适应父容器，不溢出，贴合父级 */
+        .drag-area {
+            width:100%;border:2px dashed #ccc;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#666;cursor:pointer;transition:all 0.3s;
+            flex:1;/* 自适应父容器剩余高度 */
+            min-height:120px;/* 最小高度，不塌陷 */
+        }
+        .drag-area.active {border-color:#2196F3;background:#f0f8ff;color:#2196F3;}
+        .drag-area p {text-align:center;font-size:14px;line-height:1.5;}
+        /* 算法栏精简样式 - 不变 */
+        .algo-wrap {margin-top:8px;}
+        .algo-group {display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;}
+        .algo-item {display:flex;align-items:center;gap:4px;font-size:14px;}
+        /* 结果+按钮样式 - 不变 */
+        #resultOutput {width:100%;height:300px;padding:10px;border:1px solid #ddd;border-radius:4px;resize:vertical;font-size:13px;line-height:1.4;background:#fafafa;white-space:pre-wrap;overflow-y:auto;}
+        .btn-group {display:flex;gap:10px;margin-top:12px;}
+        button {padding:8px 16px;border:none;border-radius:4px;background:#2196F3;color:#fff;cursor:pointer;font-size:14px;transition:background 0.2s;}
+        button:hover {background:#1976D2;}
+        button.clear {background:#f44336;}
+        button.clear:hover {background:#d32f2f;}
+        button.copy {background:#4CAF50;}
+        button.copy:hover {background:#388E3C;}
+        .loading {color:#2196F3;font-size:14px;text-align:center;display:none;margin-top:8px;}
+        /* 响应式适配 - 不变 */
+        @media (max-width:768px) {
+            .row-box {flex-direction:column;}
+            .col-box {min-width:unset;}
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="title">本地哈希计算工具（文本/文件/文件夹 + CryptoJS全算法）</h2>
+
+        <!-- 左右并列：左文本 / 右拖拽 -->
+        <div class="row-box">
+            <div class="col-box">
+                <div class="section">
+                    <h3>一、 文本哈希输入</h3>
+                    <textarea id="textInput" placeholder="输入文字，本地计算哈希，无数据上传..."></textarea>
+                </div>
+            </div>
+            <div class="col-box">
+                <div class="section">
+                    <h3>二、 拖拽文件/文件夹</h3>
+                    <div id="dragArea" class="drag-area">
+                        <p>🖱️ 拖拽至此</p>
+                        <p>单/多文件/文件夹，自动递归子文件</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 精简5排算法：无分类提示 -->
+        <div class="section">
+            <h3>三、 选择哈希算法（可多选）</h3>
+            <div class="algo-wrap">
+                <div class="algo-group"><label class="algo-item"><input type="checkbox" name="algo" value="MD5" checked> MD5</label></div>
+                <div class="algo-group"><label class="algo-item"><input type="checkbox" name="algo" value="SHA-1"> SHA-1</label></div>
+                <div class="algo-group">
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-256" checked> SHA-256</label>
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-384"> SHA-384</label>
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-512" checked> SHA-512</label>
+                </div>
+                <div class="algo-group">
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-3-224"> SHA3-224</label>
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-3-256"> SHA3-256</label>
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-3-384"> SHA3-384</label>
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-3-512"> SHA3-512</label>
+                </div>
+                <div class="algo-group"><label class="algo-item"><input type="checkbox" name="algo" value="RIPEMD-160"> RIPEMD-160</label></div>
+            </div>
+        </div>
+
+        <!-- 操作按钮 + 加载提示 -->
+        <div class="btn-group">
+            <button id="calcBtn">开始计算哈希</button>
+            <button id="copyBtn" class="copy">复制全部结果</button>
+            <button id="clearBtn" class="clear">清空所有内容</button>
+        </div>
+        <div class="loading" id="loading">计算中... 大文件请稍候</div>
+
+        <!-- 结果输出区 -->
+        <div class="section">
+            <h3>四、 哈希计算结果</h3>
+            <textarea id="resultOutput" readonly placeholder="计算结果将展示在这里..."></textarea>
+        </div>
+    </div>
+
+    <script>
+        // 全局DOM获取
+        const textInput = document.getElementById('textInput');
+        const dragArea = document.getElementById('dragArea');
+        const resultOutput = document.getElementById('resultOutput');
+        const calcBtn = document.getElementById('calcBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const loading = document.getElementById('loading');
+        const algoCheckboxes = document.querySelectorAll('input[name="algo"]');
+        let fileList = [];
+
+        // 全局阻止拖拽默认行为，别处无反应
+        document.addEventListener('dragover', (e) => e.preventDefault());
+        document.addEventListener('drop', (e) => e.preventDefault());
+
+        // ========== 核心工具函数 ==========
+        function getSelectedAlgos() {
+            return Array.from(algoCheckboxes).filter(box => box.checked).map(box => box.value);
+        }
+        function calcTextHashByCryptoJS(text) {
+            const algos = getSelectedAlgos();
+            if (algos.length === 0) return '请至少选择一种哈希算法！';
+            let result = `【文本哈希】输入内容：${text.trim()}\n`;
+            algos.forEach(algo => {
+                let hash = '';
+                switch(algo) {
+                    case 'MD5': hash = CryptoJS.MD5(text).toString(); break;
+                    case 'SHA-1': hash = CryptoJS.SHA1(text).toString(); break;
+                    case 'SHA-256': hash = CryptoJS.SHA256(text).toString(); break;
+                    case 'SHA-384': hash = CryptoJS.SHA384(text).toString(); break;
+                    case 'SHA-512': hash = CryptoJS.SHA512(text).toString(); break;
+                    case 'SHA-3-224': hash = CryptoJS.SHA3(CryptoJS.enc.Utf8.parse(text), { outputLength: 224 }).toString(); break;
+                    case 'SHA-3-256': hash = CryptoJS.SHA3(CryptoJS.enc.Utf8.parse(text), { outputLength: 256 }).toString(); break;
+                    case 'SHA-3-384': hash = CryptoJS.SHA3(CryptoJS.enc.Utf8.parse(text), { outputLength: 384 }).toString(); break;
+                    case 'SHA-3-512': hash = CryptoJS.SHA3(CryptoJS.enc.Utf8.parse(text), { outputLength: 512 }).toString(); break;
+                    case 'RIPEMD-160': hash = CryptoJS.RIPEMD160(text).toString(); break;
+                    default: hash = `算法${algo}不支持`;
+                }
+                result += `└── ${algo}：${hash}\n`;
+            });
+            return result + '\n';
+        }
+        function calcFileHashByCryptoJS(file) {
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const wordArray = CryptoJS.lib.WordArray.create(e.target.result);
+                    const algos = getSelectedAlgos();
+                    let result = '';
+                    algos.forEach(algo => {
+                        let hash = '';
+                        switch(algo) {
+                            case 'MD5': hash = CryptoJS.MD5(wordArray).toString(); break;
+                            case 'SHA-1': hash = CryptoJS.SHA1(wordArray).toString(); break;
+                            case 'SHA-256': hash = CryptoJS.SHA256(wordArray).toString(); break;
+                            case 'SHA-384': hash = CryptoJS.SHA384(wordArray).toString(); break;
+                            case 'SHA-512': hash = CryptoJS.SHA512(wordArray).toString(); break;
+                            case 'SHA-3-224': hash = CryptoJS.SHA3(wordArray, { outputLength: 224 }).toString(); break;
+                            case 'SHA-3-256': hash = CryptoJS.SHA3(wordArray, { outputLength: 256 }).toString(); break;
+                            case 'SHA-3-384': hash = CryptoJS.SHA3(wordArray, { outputLength: 384 }).toString(); break;
+                            case 'SHA-3-512': hash = CryptoJS.SHA3(wordArray, { outputLength: 512 }).toString(); break;
+                            case 'RIPEMD-160': hash = CryptoJS.RIPEMD160(wordArray).toString(); break;
+                            default: hash = `算法${algo}不支持`;
+                        }
+                        result += `└── ${algo}：${hash}\n`;
+                    });
+                    resolve(result);
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // ========== 文件夹递归遍历 ==========
+        async function traverseFolder(entry, path = '') {
+            const fullPath = path ? `${path}/${entry.name}` : entry.name;
+            if (entry.isFile) return new Promise(resolve => entry.file(file => { fileList.push({ path: fullPath, file }); resolve(); }));
+            if (entry.isDirectory) {
+                const reader = entry.createReader();
+                return new Promise(resolve => {
+                    const readEntries = () => reader.readEntries(entries => entries.length === 0 ? resolve() : Promise.all(entries.map(e => traverseFolder(e, fullPath))).then(readEntries));
+                    readEntries();
+                });
+            }
+        }
+        async function calcFilesHash() {
+            if (fileList.length === 0) return '';
+            let result = `【批量文件哈希】共${fileList.length}个文件\n`;
+            for (const { path, file } of fileList) {
+                result += `\n【文件哈希】完整路径：${path}\n`;
+                result += await calcFileHashByCryptoJS(file);
+            }
+            return result + '\n';
+        }
+
+        // ========== 拖拽功能 ==========
+        dragArea.addEventListener('dragover', (e) => { e.preventDefault(); dragArea.classList.add('active'); });
+        dragArea.addEventListener('dragleave', () => dragArea.classList.remove('active'));
+        dragArea.addEventListener('drop', async (e) => {
+            e.preventDefault(); dragArea.classList.remove('active'); fileList = [];
+            const items = e.dataTransfer.items;
+            for (const item of items) { const entry = item.webkitGetAsEntry(); if (entry) await traverseFolder(entry); }
+            if (fileList.length > 0) resultOutput.value += `✅ 已识别${fileList.length}个文件\n\n`;
+        });
+
+        // ========== 按钮事件 ==========
+        calcBtn.addEventListener('click', async () => {
+            loading.style.display = 'block'; resultOutput.value = ''; let finalResult = '';
+            if (textInput.value.trim()) finalResult += calcTextHashByCryptoJS(textInput.value);
+            if (fileList.length > 0) finalResult += await calcFilesHash();
+            resultOutput.value = finalResult || '请输入文本或拖拽文件后计算！';
+            loading.style.display = 'none';
+        });
+        copyBtn.addEventListener('click', async () => {
+            if (resultOutput.value.trim()) { await navigator.clipboard.writeText(resultOutput.value); alert('结果已复制！'); }
+        });
+        clearBtn.addEventListener('click', () => {
+            textInput.value = ''; resultOutput.value = ''; fileList = [];
+            algoCheckboxes.forEach(box => box.checked = ['MD5','SHA-256','SHA-512'].includes(box.value));
+        });
+    </script>
+</body>
+</html>

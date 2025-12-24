@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>本地哈希计算工具（文本实时+文件累加 分栏版）</title>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
+    <style>
+        * {margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif;}
+        body {padding:20px;max-width:1600px;margin:0 auto;background:#f5f5f5;}
+        .container {gap:20px;display:flex;flex-direction:column;}
+        .title {text-align:center;color:#333;margin-bottom:10px;font-size:18px;}
+        /* 通用左右并列布局 */
+        .row-box {display:flex;gap:20px;width:100%;}
+        .col-box {flex:1;min-width:300px;}
+        /* 通用模块容器：高度自适应不溢出 */
+        .section {
+            background:#fff;padding:18px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);
+            display:flex;flex-direction:column;
+        }
+        .section h3 {color:#444;margin-bottom:12px;font-size:16px;border-bottom:1px solid #eee;padding-bottom:8px;}
+        /* 左侧文本输入 + 右侧拖拽区 样式 */
+        #textInput {
+            width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;resize:vertical;font-size:14px;
+            flex:1;min-height:120px;outline:none;
+        }
+        .drag-area {
+            width:100%;border:2px dashed #ccc;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#666;cursor:pointer;transition:all 0.3s;
+            flex:1;min-height:120px;
+        }
+        .drag-area.active {border-color:#2196F3;background:#f0f8ff;color:#2196F3;}
+        .drag-area p {text-align:center;font-size:14px;line-height:1.5;}
+        /* 算法栏：精简5排 无多余提示 */
+        .algo-wrap {margin-top:8px;}
+        .algo-group {display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;}
+        .algo-item {display:flex;align-items:center;gap:4px;font-size:14px;}
+        /* 结果区：左右分栏 专属对应 */
+        .result-box {
+            width:100%;height:100%;min-height:300px;padding:10px;border:1px solid #ddd;border-radius:4px;resize:vertical;font-size:13px;line-height:1.4;
+            background:#fafafa;white-space:pre-wrap;overflow-y:auto;flex:1;
+        }
+        /* 按钮+加载样式 */
+        .btn-group {display:flex;gap:10px;margin-top:12px;}
+        button {padding:8px 16px;border:none;border-radius:4px;background:#2196F3;color:#fff;cursor:pointer;font-size:14px;transition:background 0.2s;}
+        button:hover {background:#1976D2;}
+        button.clear {background:#f44336;}
+        button.clear:hover {background:#d32f2f;}
+        button.copy {background:#4CAF50;}
+        button.copy:hover {background:#388E3C;}
+        .loading {color:#2196F3;font-size:14px;text-align:center;display:none;margin-top:8px;}
+        /* 响应式适配：小屏幕自动上下布局，不挤乱 */
+        @media (max-width:768px) {
+            .row-box {flex-direction:column;}
+            .col-box {min-width:unset;}
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="title">本地哈希计算工具（文本实时计算 | 文件拖拽累加 | 结果分栏展示）</h2>
+
+        <!-- 1. 顶部左右分栏：左=文本输入（实时算） 右=文件拖拽（累加算） -->
+        <div class="row-box">
+            <div class="col-box">
+                <div class="section">
+                    <h3>一、 文本哈希输入（实时计算，输入即更）</h3>
+                    <textarea id="textInput" placeholder="输入/修改文字实时计算哈希，左列实时更新覆盖旧结果..."></textarea>
+                </div>
+            </div>
+            <div class="col-box">
+                <div class="section">
+                    <h3>二、 拖拽文件/文件夹（自动累加，拖拽即算）</h3>
+                    <div id="dragArea" class="drag-area">
+                        <p>🖱️ 拖拽文件/文件夹至此</p>
+                        <p>多批次拖拽累加 | 自动递归子文件 | 右列只追加不清除</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 哈希算法选择：全局通用，5排精简 -->
+        <div class="section">
+            <h3>三、 选择哈希算法（全局通用，可多选）</h3>
+            <div class="algo-wrap">
+                <div class="algo-group"><label class="algo-item"><input type="checkbox" name="algo" value="MD5" checked> MD5</label></div>
+                <div class="algo-group"><label class="algo-item"><input type="checkbox" name="algo" value="SHA-1"> SHA-1</label></div>
+                <div class="algo-group">
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-256" checked> SHA-256</label>
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-384"> SHA-384</label>
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-512" checked> SHA-512</label>
+                </div>
+                <div class="algo-group">
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-3-224"> SHA3-224</label>
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-3-256"> SHA3-256</label>
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-3-384"> SHA3-384</label>
+                    <label class="algo-item"><input type="checkbox" name="algo" value="SHA-3-512"> SHA3-512</label>
+                </div>
+                <div class="algo-group"><label class="algo-item"><input type="checkbox" name="algo" value="RIPEMD-160"> RIPEMD-160</label></div>
+            </div>
+        </div>
+
+        <!-- 3. 操作按钮 -->
+        <div class="btn-group">
+            <button id="copyAllBtn" class="copy">复制全部结果</button>
+            <button id="clearAllBtn" class="clear">清空所有内容</button>
+        </div>
+        <div class="loading" id="loading">计算中... 大文件请稍候</div>
+
+        <!-- 4. 结果区：左右分栏 专属对应（核心需求） -->
+        <div class="row-box">
+            <div class="col-box">
+                <div class="section">
+                    <h3>四、 文本哈希结果（实时覆盖，仅当前文本）</h3>
+                    <textarea id="textResult" class="result-box" readonly placeholder="文本哈希结果将实时展示在这里..."></textarea>
+                </div>
+            </div>
+            <div class="col-box">
+                <div class="section">
+                    <h3>五、 文件哈希结果（拖拽累加，永久保留）</h3>
+                    <textarea id="fileResult" class="result-box" readonly placeholder="文件哈希结果将拖拽累加展示在这里..."></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局DOM获取：分栏结果+核心元素
+        const textInput = document.getElementById('textInput');
+        const dragArea = document.getElementById('dragArea');
+        const textResult = document.getElementById('textResult');
+        const fileResult = document.getElementById('fileResult');
+        const copyAllBtn = document.getElementById('copyAllBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const loading = document.getElementById('loading');
+        const algoCheckboxes = document.querySelectorAll('input[name="algo"]');
+        let fileList = []; // 文件列表：累加不清除（核心）
+
+        // 1. 全局阻止拖拽默认行为，仅拖拽框生效，别处无反应
+        document.addEventListener('dragover', (e) => e.preventDefault());
+        document.addEventListener('drop', (e) => e.preventDefault());
+
+        // ========== 核心通用工具函数 ==========
+        // 1. 获取全局选中的算法（通用）
+        function getSelectedAlgos() {
+            const selected = Array.from(algoCheckboxes).filter(box => box.checked).map(box => box.value);
+            return selected.length > 0 ? selected : ['MD5', 'SHA-256', 'SHA-512']; // 默认选中常用算法
+        }
+
+        // 2. 单数据统一哈希计算（文本/文件通用，覆盖全算法）
+        function calcSingleHash(data, isText = true) {
+            const algos = getSelectedAlgos();
+            let hashResult = '';
+            // 文本=直接传字符串，文件=传WordArray二进制
+            const targetData = isText ? data : CryptoJS.lib.WordArray.create(data);
+            algos.forEach(algo => {
+                let hash = '';
+                switch(algo) {
+                    case 'MD5': hash = CryptoJS.MD5(targetData).toString(); break;
+                    case 'SHA-1': hash = CryptoJS.SHA1(targetData).toString(); break;
+                    case 'SHA-256': hash = CryptoJS.SHA256(targetData).toString(); break;
+                    case 'SHA-384': hash = CryptoJS.SHA384(targetData).toString(); break;
+                    case 'SHA-512': hash = CryptoJS.SHA512(targetData).toString(); break;
+                    case 'SHA-3-224': hash = CryptoJS.SHA3(targetData, { outputLength: 224 }).toString(); break;
+                    case 'SHA-3-256': hash = CryptoJS.SHA3(targetData, { outputLength: 256 }).toString(); break;
+                    case 'SHA-3-384': hash = CryptoJS.SHA3(targetData, { outputLength: 384 }).toString(); break;
+                    case 'SHA-3-512': hash = CryptoJS.SHA3(targetData, { outputLength: 512 }).toString(); break;
+                    case 'RIPEMD-160': hash = CryptoJS.RIPEMD160(targetData).toString(); break;
+                    default: hash = `算法${algo}暂不支持`;
+                }
+                hashResult += `└── ${algo}：${hash}\n`;
+            });
+            return hashResult;
+        }
+
+        // ========== 文本哈希：实时计算 + 覆盖旧结果（核心需求） ==========
+        function calcTextHashRealTime() {
+            const text = textInput.value.trim();
+            // 无文本=清空结果，有文本=实时计算覆盖
+            if (!text) {
+                textResult.value = '请输入文本，实时生成哈希结果...';
+                return;
+            }
+            const result = `【文本哈希】输入时间：${new Date().toLocaleString()}\n输入内容：${text}\n${calcSingleHash(text, true)}\n`;
+            textResult.value = result; // 覆盖旧结果，不保留历史
+        }
+        // 绑定文本实时触发事件：输入/修改/删除/算法切换 都触发
+        textInput.addEventListener('input', calcTextHashRealTime);
+        algoCheckboxes.forEach(box => box.addEventListener('change', calcTextHashRealTime));
+        // 初始化文本结果
+        calcTextHashRealTime();
+
+        // ========== 文件哈希：拖拽累加 + 自动计算 + 不清除（核心需求） ==========
+        // 1. 递归遍历文件夹，累加文件列表
+        async function traverseFolder(entry, path = '') {
+            const fullPath = path ? `${path}/${entry.name}` : entry.name;
+            if (entry.isFile) {
+                return new Promise(resolve => entry.file(file => {
+                    fileList.push({ path: fullPath, file }); // 累加，不清空
+                    resolve();
+                }));
+            }
+            if (entry.isDirectory) {
+                const reader = entry.createReader();
+                return new Promise(resolve => {
+                    const readEntries = () => reader.readEntries(entries => {
+                        entries.length === 0 ? resolve() : Promise.all(entries.map(e => traverseFolder(e, fullPath))).then(readEntries);
+                    });
+                    readEntries();
+                });
+            }
+        }
+
+        // 2. 单文件哈希计算 + 追加到结果
+        async function calcSingleFileHash(fileObj) {
+            const { path, file } = fileObj;
+            return new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const hash = calcSingleHash(e.target.result, false);
+                    const result = `【文件哈希】路径：${path}\n文件名称：${file.name}\n文件大小：${(file.size / 1024).toFixed(2)} KB\n${hash}\n`;
+                    resolve(result);
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // 3. 拖拽后自动计算 + 累加结果（不清空历史）
+        async function calcFileHashAuto() {
+            if (fileList.length === 0) return;
+            loading.style.display = 'block';
+            // 只计算最新一批拖拽的文件（避免重复计算历史文件）
+            const newFiles = fileList.slice(fileList.length - currentDragCount);
+            let newResult = '';
+            for (const file of newFiles) {
+                newResult += await calcSingleFileHash(file);
+            }
+            // 追加结果，不覆盖历史
+            fileResult.value += newResult;
+            loading.style.display = 'none';
+        }
+
+        // 拖拽相关变量：记录单次拖拽文件数
+        let currentDragCount = 0;
+        // 绑定拖拽事件
+        dragArea.addEventListener('dragover', (e) => { e.preventDefault(); dragArea.classList.add('active'); });
+        dragArea.addEventListener('dragleave', () => dragArea.classList.remove('active'));
+        dragArea.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dragArea.classList.remove('active');
+            const items = e.dataTransfer.items;
+            if (!items.length) return;
+
+            // 记录单次拖拽文件数，用于后续只算新文件
+            currentDragCount = 0;
+            const tempList = [];
+            // 先统计单次拖拽数量，再累加
+            for (const item of items) {
+                const entry = item.webkitGetAsEntry();
+                if (entry) tempList.push(traverseFolder(entry));
+            }
+            await Promise.all(tempList);
+            currentDragCount = fileList.length - (fileList.length - tempList.length);
+            // 自动计算新文件哈希
+            await calcFileHashAuto();
+            // 提示新增数量
+            fileResult.value = fileResult.value.replace(/^✅.+\n/, '') + `✅ 新增${currentDragCount}个文件，累计${fileList.length}个文件\n\n`;
+        });
+
+        // ========== 全局操作：复制全部 + 清空所有（核心需求） ==========
+        // 1. 复制左右两栏所有结果
+        copyAllBtn.addEventListener('click', async () => {
+            const allResult = `=== 文本哈希结果 ===\n${textResult.value}\n=== 文件哈希结果 ===\n${fileResult.value}`;
+            if (!allResult.trim()) return alert('暂无结果可复制！');
+            await navigator.clipboard.writeText(allResult);
+            alert('✅ 文本+文件所有哈希结果已复制！');
+        });
+
+        // 2. 清空所有：文本+文本结果+文件列表+文件结果+重置算法
+        clearAllBtn.addEventListener('click', () => {
+            textInput.value = '';
+            textResult.value = '请输入文本，实时生成哈希结果...';
+            fileList = [];
+            fileResult.value = '文件哈希结果将拖拽累加展示在这里...';
+            // 重置默认算法勾选
+            algoCheckboxes.forEach(box => {
+                box.checked = ['MD5', 'SHA-256', 'SHA-512'].includes(box.value);
+            });
+            // 重置实时计算
+            calcTextHashRealTime();
+            alert('✅ 已清空所有内容，恢复初始状态！');
+        });
+
+        // 初始化文件结果提示
+        if (!fileResult.value.trim()) {
+            fileResult.value = '文件哈希结果将拖拽累加展示在这里...';
+        }
+    </script>
+</body>
+</html>
