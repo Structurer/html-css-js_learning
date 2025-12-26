@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>完整离线计算器（标准+科学+历史记录）</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 主容器：双计算器+历史记录 布局，贴合原站 -->
+    <div class="calc-wrap">
+        <!-- 计算器核心容器（含切换功能） -->
+        <div class="calc-main">
+            <!-- 切换按钮：标准/科学计算器 -->
+            <div class="calc-tab">
+                <button id="standardTab" class="tab-active">标准计算器</button>
+                <button id="sciTab">科学计算器</button>
+            </div>
+            <!-- 标准计算器（原功能保留，完整无删减） -->
+            <div id="standardCalc" class="calculator show-calc">
+                <input type="text" id="calcDisplay" readonly class="calc-display">
+                <div class="btn-row">
+                    <button onclick="clearAll()">AC</button>
+                    <button onclick="deleteLast()">←</button>
+                    <button onclick="appendChar('%')">%</button>
+                    <button onclick="appendChar('/')" class="btn-operator">÷</button>
+                </div>
+                <div class="btn-row">
+                    <button onclick="appendChar('7')">7</button>
+                    <button onclick="appendChar('8')">8</button>
+                    <button onclick="appendChar('9')">9</button>
+                    <button onclick="appendChar('*')" class="btn-operator">×</button>
+                </div>
+                <div class="btn-row">
+                    <button onclick="appendChar('4')">4</button>
+                    <button onclick="appendChar('5')">5</button>
+                    <button onclick="appendChar('6')">6</button>
+                    <button onclick="appendChar('-')" class="btn-operator">−</button>
+                </div>
+                <div class="btn-row">
+                    <button onclick="appendChar('1')">1</button>
+                    <button onclick="appendChar('2')">2</button>
+                    <button onclick="appendChar('3')">3</button>
+                    <button onclick="appendChar('+')" class="btn-operator">+</button>
+                </div>
+                <div class="btn-row">
+                    <button onclick="appendChar('(')">(</button>
+                    <button onclick="appendChar('0')">0</button>
+                    <button onclick="appendChar('.')">.</button>
+                    <button onclick="appendChar(')')">)</button>
+                </div>
+                <div class="btn-row">
+                    <button onclick="calculateResult()" class="btn-equal">=</button>
+                </div>
+            </div>
+            <!-- 科学计算器（完整还原原站所有功能，无删减） -->
+            <div id="sciCalc" class="calculator sci-calc">
+                <input type="text" id="sciDisplay" readonly class="calc-display">
+                <!-- 科学计算功能区1：常量+基础科学运算 -->
+                <div class="btn-row">
+                    <button onclick="appendChar('π')">π</button>
+                    <button onclick="appendChar('e')">e</button>
+                    <button onclick="appendChar('²')" class="btn-sci">x²</button>
+                    <button onclick="appendChar('³')" class="btn-sci">x³</button>
+                    <button onclick="appendChar('^')" class="btn-sci">xʸ</button>
+                </div>
+                <div class="btn-row">
+                    <button onclick="appendChar('√')" class="btn-sci">√x</button>
+                    <button onclick="appendChar('∛')" class="btn-sci">∛x</button>
+                    <button onclick="appendChar('1/')" class="btn-sci">1/x</button>
+                    <button onclick="appendChar('!')" class="btn-sci">x!</button>
+                    <button onclick="appendChar('ln(')" class="btn-sci">ln</button>
+                </div>
+                <!-- 科学计算功能区2：对数+三角函数 -->
+                <div class="btn-row">
+                    <button onclick="appendChar('log10(')" class="btn-sci">log</button>
+                    <button onclick="appendChar('sin(')" class="btn-sci">sin</button>
+                    <button onclick="appendChar('cos(')" class="btn-sci">cos</button>
+                    <button onclick="appendChar('tan(')" class="btn-sci">tan</button>
+                    <button onclick="appendChar('asin(')" class="btn-sci">arcsin</button>
+                </div>
+                <div class="btn-row">
+                    <button onclick="appendChar('acos(')" class="btn-sci">arccos</button>
+                    <button onclick="appendChar('atan(')" class="btn-sci">arctan</button>
+                    <button onclick="appendChar('(-)')" class="btn-sci">±</button>
+                    <button onclick="clearAll()">AC</button>
+                    <button onclick="deleteLast()">←</button>
+                </div>
+                <!-- 科学计算器数字+基础运算符区（和标准计算器一致，补全完整操作） -->
+                <div class="btn-row">
+                    <button onclick="appendChar('7')">7</button>
+                    <button onclick="appendChar('8')">8</button>
+                    <button onclick="appendChar('9')">9</button>
+                    <button onclick="appendChar('*')" class="btn-operator">×</button>
+                    <button onclick="appendChar('/')" class="btn-operator">÷</button>
+                </div>
+                <div class="btn-row">
+                    <button onclick="appendChar('4')">4</button>
+                    <button onclick="appendChar('5')">5</button>
+                    <button onclick="appendChar('6')">6</button>
+                    <button onclick="appendChar('+')" class="btn-operator">+</button>
+                    <button onclick="appendChar('-')" class="btn-operator">−</button>
+                </div>
+                <div class="btn-row">
+                    <button onclick="appendChar('1')">1</button>
+                    <button onclick="appendChar('2')">2</button>
+                    <button onclick="appendChar('3')">3</button>
+                    <button onclick="appendChar('(')">(</button>
+                    <button onclick="appendChar(')')">)</button>
+                </div>
+                <div class="btn-row">
+                    <button onclick="appendChar('0')">0</button>
+                    <button onclick="appendChar('.')">.</button>
+                    <button onclick="appendChar('%')">%</button>
+                    <button onclick="calculateResult()" class="btn-equal">=</button>
+                </div>
+            </div>
+        </div>
+        <!-- 计算历史记录（完整保留，双计算器运算记录统一留存） -->
+        <div class="history-wrap">
+            <h3 class="history-title">计算历史</h3>
+            <div id="calcHistory" class="history-content"></div>
+        </div>
+    </div>
+
+    <script src="calc.js"></script>
+</body>
+</html>

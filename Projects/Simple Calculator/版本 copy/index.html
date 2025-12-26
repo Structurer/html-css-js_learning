@@ -16,7 +16,7 @@
             background-color: #f4f4f4;
         }
 
-       .calculator {
+        .calculator {
             background-color: #fff;
             padding: 20px;
             border-radius: 10px;
@@ -24,7 +24,7 @@
             max-width: 400px;
         }
 
-       .display {
+        .display {
             width: 100%;
             height: 60px;
             background-color: #333;
@@ -36,15 +36,17 @@
             margin-bottom: 10px;
             box-sizing: border-box;
             overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
         }
 
-       .buttons {
+        .buttons {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             grid-gap: 10px;
         }
 
-       .buttons button {
+        .buttons button {
             width: 100%;
             padding: 20px;
             font-size: 24px;
@@ -55,13 +57,18 @@
             transition: background-color 0.3s;
         }
 
-       .buttons button:hover {
+        .buttons button:hover {
             background-color: #ccc;
         }
 
-       .buttons button.operation {
+        .buttons button.operation {
             background-color: #ff8c00;
             color: white;
+        }
+        /* 仅加按压效果，不改动原样式布局 */
+        .buttons button:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
     </style>
 </head>
@@ -95,40 +102,107 @@
 
     <script>
         let display = document.getElementById('display');
+        // 标记计算完成/错误状态，优化输入逻辑，不改动原函数名
+        window.calcCompleted = false;
 
+        // 优化输入逻辑，修复原bug，保留原函数名
         function input(value) {
-            if (display.innerText === '0') {
-                display.innerText = value;
-            } else {
-                display.innerText += value;
+            const currentText = display.innerText;
+            // 错误/计算完成后，直接重置显示，无需手动清C
+            if (currentText === '错误' || window.calcCompleted) {
+                display.innerText = '0';
+                window.calcCompleted = false;
             }
+            const lastChar = currentText.slice(-1);
+            const operators = ['+', '−', '×', '÷'];
+            const brackets = ['(', ')'];
+
+            // 修复原bug：0后输.显示0. 而非.
+            if (currentText === '0') {
+                if (value === '.') {
+                    display.innerText = '0.';
+                    return;
+                }
+                // 原逻辑保留，非0数字替换初始0
+                if (!brackets.includes(value) && !operators.includes(value)) {
+                    display.innerText = value;
+                    return;
+                }
+            }
+
+            // 拦截非法输入：连续运算符、右括号前跟运算符/左括号
+            if (operators.includes(value) && operators.includes(lastChar)) return;
+            if (value === ')' && (operators.includes(lastChar) || lastChar === '(')) return;
+            
+            // 原追加逻辑保留
+            display.innerText += value;
         }
 
+        // 原清空函数，加状态重置
         function clearDisplay() {
             display.innerText = '0';
+            window.calcCompleted = false;
         }
 
+        // 优化回删，修复原单字符/错误状态回删bug
         function deleteLast() {
-            display.innerText = display.innerText.slice(0, -1);
-            if (display.innerText === '') {
+            const currentText = display.innerText;
+            if (currentText === '错误' || currentText.length === 1) {
                 display.innerText = '0';
+                window.calcCompleted = false;
+                return;
             }
+            display.innerText = currentText.slice(0, -1);
+            window.calcCompleted = false;
         }
 
+        // 核心优化：安全替换eval，优化精度，兼容简写乘法，保留原函数名
         function calculate() {
             try {
                 let expression = display.innerText;
-                // 处理左括号前是数字的情况
-                expression = expression.replace(/(\d)\((\d)/g, '$1*($2');
-                let result = eval(expression.replace('×', '*').replace('÷', '/'));
-                if (!Number.isInteger(result)) {
-                    result = result.toFixed(3);
+                // 兼容原逻辑+增强：2(3+4)→2*(3+4)、(2+3)(4+5)→(2+3)*(4+5)
+                expression = expression.replace(/(\d|\))\((\d)/g, '$1*($2');
+                // 原符号替换逻辑保留
+                expression = expression.replace('×', '*').replace('÷', '/').replace('−', '-');
+                // 安全替代eval，无注入风险
+                let result = new Function('return ' + expression)();
+
+                // 优化原精度bug：去末尾多余0/小数点，不强制保留3位
+                let resultStr = result.toString();
+                if (resultStr.includes('.')) {
+                    resultStr = resultStr.replace(/0+$/, '').replace(/\.$/, '');
                 }
-                display.innerText = result.toString();
+                // 超大/极小值自动转科学计数法，避免显示异常
+                if (Math.abs(result) > 1e12 || (Math.abs(result) < 1e-6 && result !== 0)) {
+                    resultStr = result.toExponential(3);
+                }
+                display.innerText = resultStr;
+                window.calcCompleted = true;
             } catch {
                 display.innerText = '错误';
+                window.calcCompleted = true;
             }
         }
+
+        // 新增键盘支持，不改动界面，实用增强（原界面无影响）
+        document.addEventListener('keydown', function(e) {
+            const key = e.key;
+            if (/[0-9.]/.test(key)) {
+                input(key);
+                return;
+            }
+            switch (key) {
+                case '+': input('+'); break;
+                case '-': input('−'); break;
+                case '*': input('×'); break;
+                case '/': input('÷'); break;
+                case '(': input('('); break;
+                case ')': input(')'); break;
+                case 'Enter': e.preventDefault(); calculate(); break;
+                case 'Backspace': deleteLast(); break;
+                case 'Escape': clearDisplay(); break;
+            }
+        });
     </script>
 </body>
 

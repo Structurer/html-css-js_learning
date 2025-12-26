@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>math.js计算器</title>
+    <!-- 引入math.js库（CDN方式，无需下载） -->
+    <script src="./math.min.js"></script>
+    <!-- 保留你喜欢的初始样式，无任何修改 -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+        .calculator {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+        }
+        .display {
+            width: 100%;
+            height: 60px;
+            background-color: #333;
+            color: #fff;
+            font-size: 32px;
+            text-align: right;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-gap: 10px;
+        }
+        .buttons button {
+            width: 100%;
+            padding: 20px;
+            font-size: 24px;
+            border: none;
+            border-radius: 5px;
+            background-color: #eee;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .buttons button:hover {
+            background-color: #ccc;
+        }
+        .buttons button.operation {
+            background-color: #ff8c00;
+            color: white;
+        }
+        .buttons button:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <div class="display" id="display">0</div>
+        <div class="buttons">
+            <button onclick="handleInput('(')">(</button>
+            <button onclick="handleInput(')')">)</button>
+            <button onclick="deleteChar()">→</button>
+            <button onclick="clearAll()">C</button>
+            <button onclick="handleInput('7')">7</button>
+            <button onclick="handleInput('8')">8</button>
+            <button onclick="handleInput('9')">9</button>
+            <button onclick="handleInput('÷')" class="operation">÷</button>
+            <button onclick="handleInput('4')">4</button>
+            <button onclick="handleInput('5')">5</button>
+            <button onclick="handleInput('6')">6</button>
+            <button onclick="handleInput('×')" class="operation">×</button>
+            <button onclick="handleInput('1')">1</button>
+            <button onclick="handleInput('2')">2</button>
+            <button onclick="handleInput('3')">3</button>
+            <button onclick="handleInput('-')" class="operation">−</button>
+            <button onclick="handleInput('0')">0</button>
+            <button onclick="handleInput('.')">.</button>
+            <button onclick="calculateResult()" class="operation">=</button>
+            <button onclick="handleInput('+')" class="operation">+</button>
+        </div>
+    </div>
+
+<script>
+// 状态管理（保留原有逻辑，保证交互流畅）
+const display = document.getElementById('display');
+const calculatorState = {
+    currentExpr: '',
+    isCalculated: false,
+    operators: ['+', '−', '×', '÷'],
+    brackets: ['(', ')']
+};
+
+// 更新显示（保留原有逻辑）
+function updateDisplay(content) {
+    display.innerText = content || '0';
+}
+
+// 获取最后一个字符（保留原有逻辑）
+function getLastChar() {
+    return calculatorState.currentExpr.slice(-1);
+}
+
+// 获取最后一个数字段（保留原有逻辑，用于小数点去重）
+function getLastNumSegment() {
+    return calculatorState.currentExpr.split(/[\+\-\×\÷\(\)]/).pop() || '';
+}
+
+// 输入处理（保留原有交互校验，避免无效输入）
+function handleInput(value) {
+    const { currentExpr, isCalculated, operators, brackets } = calculatorState;
+    const lastChar = getLastChar();
+
+    // 计算完成后的输入逻辑
+    if (isCalculated) {
+        if (operators.includes(value)) {
+            // 结果后接运算符，继续连续计算
+            calculatorState.currentExpr = currentExpr + value;
+        } else if (brackets.includes(value) || /\d|\./.test(value)) {
+            // 结果后接数字/括号/小数点，新建表达式
+            calculatorState.currentExpr = value === '(' ? currentExpr + value : value;
+        }
+        calculatorState.isCalculated = false;
+        updateDisplay(calculatorState.currentExpr);
+        return;
+    }
+
+    // 小数点去重校验
+    if (value === '.' && getLastNumSegment().includes('.')) return;
+
+    // 负数输入允许（开头/运算符后/括号后）
+    if (value === '-') {
+        if (currentExpr === '' || operators.includes(lastChar) || lastChar === '(') {
+            calculatorState.currentExpr += '-';
+            updateDisplay(calculatorState.currentExpr);
+            return;
+        }
+    }
+
+    // 禁止运算符连输
+    if (operators.includes(value) && operators.includes(lastChar)) return;
+
+    // 禁止无效括号拼接（如直接输入））
+    if (value === ')' && (operators.includes(lastChar) || lastChar === '(')) return;
+
+    // 正常拼接输入
+    calculatorState.currentExpr += value;
+    updateDisplay(calculatorState.currentExpr);
+}
+
+// 核心计算函数（用math.js重构，一行实现精准计算）
+function calculateResult() {
+    try {
+        if (!calculatorState.currentExpr) return;
+
+        // 转换计算器运算符为math.js支持的运算符
+        const validExpr = calculatorState.currentExpr
+            .replace(/×/g, '*')   // 乘号转换
+            .replace(/÷/g, '/')   // 除号转换
+            .replace(/−/g, '-');  // 减号转换
+
+        // 核心：调用math.js的evaluate方法，自动处理所有运算逻辑
+        const result = math.evaluate(validExpr);
+
+        // 格式化结果：保留14位精度，自动处理科学计数法，去除末尾多余0
+        let resStr = math.format(result, { 
+            precision: 14,
+            notation: 'auto' // 自动切换普通/科学计数法
+        });
+
+        // 去除小数点后多余的0和末尾的小数点
+        resStr = resStr.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+
+        // 更新状态和显示
+        calculatorState.currentExpr = resStr;
+        calculatorState.isCalculated = true;
+        updateDisplay(resStr);
+    } catch (err) {
+        // 异常捕获（除数为0、无效表达式等）
+        updateDisplay('错误');
+        calculatorState.currentExpr = '';
+        calculatorState.isCalculated = false;
+    }
+}
+
+// 删除最后一个字符（保留原有逻辑）
+function deleteChar() {
+    if (calculatorState.isCalculated) {
+        calculatorState.currentExpr = '';
+        calculatorState.isCalculated = false;
+        updateDisplay('0');
+        return;
+    }
+    calculatorState.currentExpr = calculatorState.currentExpr.slice(0, -1);
+    updateDisplay(calculatorState.currentExpr);
+}
+
+// 清空所有（保留原有逻辑）
+function clearAll() {
+    calculatorState.currentExpr = '';
+    calculatorState.isCalculated = false;
+    updateDisplay('0');
+}
+
+// 键盘支持（保留原有逻辑，方便纯键盘操作）
+document.addEventListener('keydown', (e) => {
+    const key = e.key;
+    const { operators } = calculatorState;
+
+    if (/[0-9.]/.test(key)) {
+        handleInput(key);
+        return;
+    }
+
+    switch (key) {
+        case '+': handleInput('+'); break;
+        case '-': handleInput('-'); break;
+        case '*': handleInput('×'); break;
+        case '/': handleInput('÷'); break;
+        case '(': handleInput('('); break;
+        case ')': handleInput(')'); break;
+        case 'Enter': calculateResult(); break;
+        case 'Backspace':
+        case 'Delete': deleteChar(); break;
+        case 'Escape': clearAll(); break;
+    }
+});
+</script>
+</body>
+</html>

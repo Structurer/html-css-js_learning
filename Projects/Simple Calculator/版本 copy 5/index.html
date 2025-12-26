@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>原生JS精准计算器（最终修复版）</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+        .calculator {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+        }
+        .display {
+            width: 100%;
+            height: 60px;
+            background-color: #333;
+            color: #fff;
+            font-size: 32px;
+            text-align: right;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-gap: 10px;
+        }
+        .buttons button {
+            width: 100%;
+            padding: 20px;
+            font-size: 24px;
+            border: none;
+            border-radius: 5px;
+            background-color: #eee;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .buttons button:hover {
+            background-color: #ccc;
+        }
+        .buttons button.operation {
+            background-color: #ff8c00;
+            color: white;
+        }
+        .buttons button:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <div class="display" id="display">0</div>
+        <div class="buttons">
+            <button onclick="input('(')">(</button>
+            <button onclick="input(')')">)</button>
+            <button onclick="deleteLast()">→</button>
+            <button onclick="clearDisplay()">C</button>
+            <button onclick="input('7')">7</button>
+            <button onclick="input('8')">8</button>
+            <button onclick="input('9')">9</button>
+            <button class="operation" onclick="input('÷')">÷</button>
+            <button onclick="input('4')">4</button>
+            <button onclick="input('5')">5</button>
+            <button onclick="input('6')">6</button>
+            <button class="operation" onclick="input('×')">×</button>
+            <button onclick="input('1')">1</button>
+            <button onclick="input('2')">2</button>
+            <button onclick="input('3')">3</button>
+            <button class="operation" onclick="input('-')">−</button>
+            <button onclick="input('0')">0</button>
+            <button onclick="input('.')">.</button>
+            <button class="operation" onclick="calculate()">=</button>
+            <button class="operation" onclick="input('+')">+</button>
+        </div>
+    </div>
+
+<script>
+let display = document.getElementById('display');
+window.calcCompleted = false;
+
+// 核心修复：仅调整代码顺序，先重置再读取currentText，解决前置0 bug
+// 同时保留 去重小数点+支持负数+计算后重置 所有功能
+function input(value) {
+    // 第一步：先执行计算后重置逻辑（提前，核心修复点）
+    if (window.calcCompleted && !['+', '−', '×', '÷'].includes(value)) {
+        display.innerText = '0';
+        window.calcCompleted = false;
+    }
+
+    // 第二步：再读取display最新值（原先是第一步，现在后移，彻底解决新旧值冲突）
+    const currentText = display.innerText;
+    const lastChar = currentText.slice(-1);
+    const operators = ['+', '−', '×', '÷'];
+    const brackets = ['(', ')'];
+
+    if (currentText === '错误' || window.calcCompleted) {
+        display.innerText = '0';
+        window.calcCompleted = false;
+    }
+
+    // 去重小数点校验
+    if (value === '.') {
+        const lastNumSeg = currentText.split(/[\+\-\×\÷\(\)]/).pop();
+        if (lastNumSeg.includes('.')) return;
+    }
+
+    // 支持负数/负小数逻辑
+    if (value === '-') {
+        if (currentText === '0' || operators.includes(lastChar) || lastChar === '(') {
+            display.innerText = currentText === '0' ? '-' : currentText + '-';
+            return;
+        }
+    }
+
+    // 原初始值替换逻辑（现在读取的是最新值，不会冲突）
+    if (currentText === '0') {
+        if (value === '.') {
+            display.innerText = '0.';
+            return;
+        }
+        if (!brackets.includes(value) && !operators.includes(value)) {
+            display.innerText = value;
+            return;
+        }
+    }
+
+    // 禁止运算符连输 + 无效括号拼接
+    if (operators.includes(value) && operators.includes(lastChar)) return;
+    if (value === ')' && (operators.includes(lastChar) || lastChar === '(')) return;
+    display.innerText += value;
+}
+
+// 清屏+删字符逻辑（不变）
+function clearDisplay() { display.innerText = '0'; window.calcCompleted = false; }
+function deleteLast() {
+    const t = display.innerText;
+    if (t === '错误' || t.length === 1) {
+        display.innerText = '0';
+        window.calcCompleted = false;
+        return;
+    }
+    display.innerText = t.slice(0, -1);
+    window.calcCompleted = false;
+}
+
+// 原生分数运算核心（精准计算逻辑，不变）
+function gcd(a, b) {
+    return b === 0 ? a : gcd(b, a % b);
+}
+function decimalToFraction(num) {
+    if (Number.isInteger(num)) return { num: num, den: 1 };
+    let str = num.toString();
+    let [integer, decimal] = str.split('.');
+    integer = integer || '0';
+    decimal = decimal || '';
+    
+    const intPart = parseInt(integer);
+    const decLen = decimal.length;
+    const decPart = parseInt(decimal);
+    const den = Math.pow(10, decLen);
+    let numTotal = intPart * den + decPart;
+    const commonDivisor = gcd(numTotal, den);
+    return { num: numTotal / commonDivisor, den: den / commonDivisor };
+}
+function addFraction(a, b) {
+    const num = a.num * b.den + b.num * a.den;
+    const den = a.den * b.den;
+    const g = gcd(num, den);
+    return { num: num / g, den: den / g };
+}
+function subFraction(a, b) {
+    const num = a.num * b.den - b.num * a.den;
+    const den = a.den * b.den;
+    const g = gcd(num, den);
+    return { num: num / g, den: den / g };
+}
+function mulFraction(a, b) {
+    const num = a.num * b.num;
+    const den = a.den * b.den;
+    const g = gcd(num, den);
+    return { num: num / g, den: den / g };
+}
+function divFraction(a, b) {
+    const num = a.num * b.den;
+    const den = a.den * b.num;
+    const g = gcd(num, den);
+    return { num: num / g, den: den / g };
+}
+
+// 括号解析函数（不变）
+function calcBracket(expr) {
+    const bracketReg = /\(([^()]+)\)/g;
+    while (bracketReg.test(expr)) {
+        expr = expr.replace(bracketReg, (match, inner) => {
+            let innerNums = inner.split(/[\+\-\*\/]/).filter(n => n).map(Number);
+            let innerOps = inner.match(/[\+\-\*\/]/g) || [];
+            if (innerNums.length === 0) return 0;
+            let res = innerNums[0];
+            for (let i = 0; i < innerOps.length; i++) {
+                switch (innerOps[i]) {
+                    case '+': res += innerNums[i+1]; break;
+                    case '-': res -= innerNums[i+1]; break;
+                    case '*': res *= innerNums[i+1]; break;
+                    case '/': res /= innerNums[i+1]; break;
+                }
+            }
+            return res.toString();
+        });
+    }
+    return expr;
+}
+
+// 解析函数（先乘除后加减，不变）
+function parseExpr(expr) {
+    expr = expr.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-').replace(/[^\d.+*/()-]/g, '');
+    expr = calcBracket(expr);
+
+    let nums = expr.split(/[\+\-\*\/]/).filter(n => n);
+    let ops = expr.match(/[\+\-\*\/]/g) || [];
+    if (nums.length === 0) return { num: 0, den: 1 };
+    let fracs = nums.map(n => decimalToFraction(parseFloat(n)));
+
+    let tempNums = [fracs[0]];
+    let tempOps = [];
+    for (let i = 0; i < ops.length; i++) {
+        if (ops[i] === '*' || ops[i] === '/') {
+            let prev = tempNums.pop();
+            let curr = fracs[i+1];
+            tempNums.push(ops[i] === '*' ? mulFraction(prev, curr) : divFraction(prev, curr));
+        } else {
+            tempNums.push(fracs[i+1]);
+            tempOps.push(ops[i]);
+        }
+    }
+
+    let result = tempNums[0];
+    for (let i = 0; i < tempOps.length; i++) {
+        result = tempOps[i] === '+' ? addFraction(result, tempNums[i+1]) : subFraction(result, tempNums[i+1]);
+    }
+    return result;
+}
+
+// 首尾运算符过滤（不变）
+function filterInvalidOps(expr) {
+    expr = expr.replace(/^[\+\×\÷]/, '');
+    expr = expr.replace(/[\+\-\×\÷]$/, '');
+    return expr;
+}
+
+// 核心计算逻辑（不变）
+function calculate() {
+    try {
+        let expr = display.innerText;
+        expr = filterInvalidOps(expr);
+        const fractionResult = parseExpr(expr);
+        const decimalResult = fractionResult.num / fractionResult.den;
+        
+        let resStr = decimalResult.toString().replace(/0+$/, '').replace(/\.$/, '');
+        if (Math.abs(decimalResult) > 1e12 || (Math.abs(decimalResult) < 1e-6 && decimalResult !== 0)) {
+            resStr = decimalResult.toExponential(3);
+        }
+        display.innerText = resStr;
+        window.calcCompleted = true;
+    } catch (err) {
+        display.innerText = '错误';
+        window.calcCompleted = true;
+    }
+}
+
+// 键盘支持（不变）
+document.addEventListener('keydown', e => {
+    const k = e.key;
+    if (/[0-9.]/.test(k)) { input(k); return; }
+    switch(k) {
+        case '+':input('+');break;case '-':input('−');break;case '*':input('×');break;case '/':input('÷');break;
+        case '(':input('(');break;case ')':input(')');break;case 'Enter':e.preventDefault();calculate();break;
+        case 'Backspace':deleteLast();break;case 'Escape':clearDisplay();break;
+    }
+});
+</script>
+</body>
+</html>

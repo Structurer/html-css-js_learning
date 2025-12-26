@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>终极根源修复 精准计算器（0.6/0.2=3）</title>
+    <script src="https://cdn.jsdelivr.net/npm/mathjs@12.4.1/lib/browser/math.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+        .calculator {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+        }
+        .display {
+            width: 100%;
+            height: 60px;
+            background-color: #333;
+            color: #fff;
+            font-size: 32px;
+            text-align: right;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-gap: 10px;
+        }
+        .buttons button {
+            width: 100%;
+            padding: 20px;
+            font-size: 24px;
+            border: none;
+            border-radius: 5px;
+            background-color: #eee;
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+        .buttons button:hover {
+            background-color: #ccc;
+        }
+        .buttons button.operation {
+            background-color: #ff8c00;
+            color: white;
+        }
+        .buttons button:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <div class="display" id="display">0</div>
+        <div class="buttons">
+            <button onclick="handleInput('(')">(</button>
+            <button onclick="handleInput(')')">)</button>
+            <button onclick="deleteChar()">→</button>
+            <button onclick="clearAll()">C</button>
+            <button onclick="handleInput('7')">7</button>
+            <button onclick="handleInput('8')">8</button>
+            <button onclick="handleInput('9')">9</button>
+            <button onclick="handleInput('/')" class="operation">÷</button>
+            <button onclick="handleInput('4')">4</button>
+            <button onclick="handleInput('5')">5</button>
+            <button onclick="handleInput('6')">6</button>
+            <button onclick="handleInput('*')" class="operation">×</button>
+            <button onclick="handleInput('1')">1</button>
+            <button onclick="handleInput('2')">2</button>
+            <button onclick="handleInput('3')">3</button>
+            <button onclick="handleInput('-')" class="operation">−</button>
+            <button onclick="handleInput('0')">0</button>
+            <button onclick="handleInput('.')">.</button>
+            <button onclick="calculateResult()" class="operation">=</button>
+            <button onclick="handleInput('+')" class="operation">+</button>
+        </div>
+    </div>
+
+<script>
+const display = document.getElementById('display');
+const calculatorState = {
+    currentExpr: '',
+    isCalculated: false,
+    operators: ['+', '-', '*', '/'],
+    brackets: ['(', ')']
+};
+let displayTimer = null;
+function updateDisplay(content) {
+    clearTimeout(displayTimer);
+    displayTimer = setTimeout(() => {
+        display.innerText = content || '0';
+    }, 5);
+}
+function getLastChar() {
+    return calculatorState.currentExpr.slice(-1);
+}
+function getLastNumSegment() {
+    return calculatorState.currentExpr.split(/[\+\-\*\/\(\)]/).pop() || '';
+}
+function handleInput(value) {
+    const { currentExpr, isCalculated, operators, brackets } = calculatorState;
+    const lastChar = getLastChar();
+    if (isCalculated) {
+        calculatorState.currentExpr = operators.includes(value) ? currentExpr + value : value;
+        calculatorState.isCalculated = false;
+        updateDisplay(calculatorState.currentExpr);
+        return;
+    }
+    if (value === '.' && getLastNumSegment().includes('.')) return;
+    if (value === ')' && !currentExpr.includes('(')) return;
+    if (operators.includes(value) && operators.includes(lastChar)) return;
+    calculatorState.currentExpr += value;
+    updateDisplay(calculatorState.currentExpr);
+}
+
+// 🔥 终极修复核心：新增小数精准转分数 + 分数运算强制生效，0.6/0.2必精准=3
+function calculateResult() {
+    try {
+        if (!calculatorState.currentExpr) return;
+        let expr = calculatorState.currentExpr;
+
+        // 关键修复1：精准解析小数，强制转分数（解决0.6、0.2这类小数解析偏差）
+        const preciseExpr = expr.replace(/\d+\.\d+/g, (num) => {
+            return `math.fraction(${num})`; // 每个小数都显式转分数，杜绝解析误差
+        });
+
+        // 关键修复2：双重保障，全局强制分数运算上下文
+        const result = math.evaluate(preciseExpr, {
+            math: {
+                number: 'Fraction', // 全局默认分数类型
+                fraction: math.fraction // 绑定分数函数
+            }
+        });
+
+        // 关键修复3：分数转数字精准格式化，无冗余
+        let resStr = math.number(result).toString();
+        // 优化显示：去末尾0、去末尾小数点，整数精准显示
+        if (resStr.includes('.')) {
+            resStr = resStr.replace(/0+$/, '').replace(/\.$/, '');
+        }
+        // 兜底：强制精准化，避免极端情况
+        resStr = math.round(math.number(result), 15).toString().replace(/0+$/, '').replace(/\.$/, '');
+
+        // 异常捕获：除数为0、无穷大、非法表达式
+        if (!isFinite(math.number(result)) || isNaN(math.number(result))) {
+            throw new Error('非法计算');
+        }
+
+        calculatorState.currentExpr = resStr;
+        calculatorState.isCalculated = true;
+        updateDisplay(resStr);
+    } catch (err) {
+        updateDisplay('错误');
+        calculatorState.currentExpr = '';
+        calculatorState.isCalculated = false;
+    }
+}
+
+function deleteChar() {
+    if (calculatorState.isCalculated) {
+        calculatorState.currentExpr = '';
+        calculatorState.isCalculated = false;
+        updateDisplay('0');
+        return;
+    }
+    calculatorState.currentExpr = calculatorState.currentExpr.slice(0, -1);
+    updateDisplay(calculatorState.currentExpr);
+}
+function clearAll() {
+    calculatorState.currentExpr = '';
+    calculatorState.isCalculated = false;
+    updateDisplay('0');
+}
+// F键过滤+F12正常调控制台
+document.addEventListener('keydown', (e) => {
+    const key = e.key;
+    const fKeys = ['F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'];
+    if (fKeys.includes(key)) return;
+    const validKeys = /[0-9.\(\)\+\-\*\/]/.test(key) || ['Enter','Backspace','Escape'].includes(key);
+    if (validKeys) e.preventDefault();
+    if (/[0-9.\(\)\+\-\*\/]/.test(key)) {
+        handleInput(key);
+        return;
+    }
+    switch (key) {
+        case 'Enter': calculateResult(); break;
+        case 'Backspace': deleteChar(); break;
+        case 'Escape': clearAll(); break;
+    }
+});
+</script>
+</body>
+</html>

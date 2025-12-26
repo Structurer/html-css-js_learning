@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+
+        .calculator {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+        }
+
+        .display {
+            width: 100%;
+            height: 60px;
+            background-color: #333;
+            color: #fff;
+            font-size: 32px;
+            text-align: right;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-gap: 10px;
+        }
+
+        .buttons button {
+            width: 100%;
+            padding: 20px;
+            font-size: 24px;
+            border: none;
+            border-radius: 5px;
+            background-color: #eee;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .buttons button:hover {
+            background-color: #ccc;
+        }
+
+        .buttons button.operation {
+            background-color: #ff8c00;
+            color: white;
+        }
+        .buttons button:active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="calculator">
+        <div class="display" id="display">0</div>
+        <div class="buttons">
+            <button onclick="input('(')">(</button>
+            <button onclick="input(')')">)</button>
+            <button onclick="deleteLast()">→</button>
+            <button onclick="clearDisplay()">C</button>
+            <button onclick="input('7')">7</button>
+            <button onclick="input('8')">8</button>
+            <button onclick="input('9')">9</button>
+            <button class="operation" onclick="input('÷')">÷</button>
+            <button onclick="input('4')">4</button>
+            <button onclick="input('5')">5</button>
+            <button onclick="input('6')">6</button>
+            <button class="operation" onclick="input('×')">×</button>
+            <button onclick="input('1')">1</button>
+            <button onclick="input('2')">2</button>
+            <button onclick="input('3')">3</button>
+            <button class="operation" onclick="input('-')">−</button>
+            <button onclick="input('0')">0</button>
+            <button onclick="input('.')">.</button>
+            <button class="operation" onclick="calculate()">=</button>
+            <button class="operation" onclick="input('+')">+</button>
+        </div>
+    </div>
+
+    <script>
+        let display = document.getElementById('display');
+        window.calcCompleted = false;
+
+        // 核心修复：解决JS浮点精度问题（0.1+0.2=0.3 而非0.30000000000000004）
+        function fixFloatPrecision(num) {
+            // 转字符串处理，兼容整数/小数/超大数，彻底消除浮点误差
+            return Number(Math.round(num + 'e12') + 'e-12');
+        }
+
+        function input(value) {
+            const currentText = display.innerText;
+            if (currentText === '错误' || window.calcCompleted) {
+                display.innerText = '0';
+                window.calcCompleted = false;
+            }
+            const lastChar = currentText.slice(-1);
+            const operators = ['+', '−', '×', '÷'];
+            const brackets = ['(', ')'];
+
+            if (currentText === '0') {
+                if (value === '.') {
+                    display.innerText = '0.';
+                    return;
+                }
+                if (!brackets.includes(value) && !operators.includes(value)) {
+                    display.innerText = value;
+                    return;
+                }
+            }
+            if (operators.includes(value) && operators.includes(lastChar)) return;
+            if (value === ')' && (operators.includes(lastChar) || lastChar === '(')) return;
+            display.innerText += value;
+        }
+
+        function clearDisplay() {
+            display.innerText = '0';
+            window.calcCompleted = false;
+        }
+
+        function deleteLast() {
+            const currentText = display.innerText;
+            if (currentText === '错误' || currentText.length === 1) {
+                display.innerText = '0';
+                window.calcCompleted = false;
+                return;
+            }
+            display.innerText = currentText.slice(0, -1);
+            window.calcCompleted = false;
+        }
+
+        function calculate() {
+            try {
+                let expression = display.innerText;
+                expression = expression.replace(/(\d|\))\((\d)/g, '$1*($2');
+                expression = expression.replace('×', '*').replace('÷', '/').replace('−', '-');
+                // 先计算结果，再修复浮点精度
+                let result = new Function('return ' + expression)();
+                result = fixFloatPrecision(result); // 关键：调用精度修复函数
+
+                // 优化显示：去末尾多余0和小数点，不冗余
+                let resultStr = result.toString();
+                if (resultStr.includes('.')) {
+                    resultStr = resultStr.replace(/0+$/, '').replace(/\.$/, '');
+                }
+                // 超大/极小值科学计数法，避免显示异常
+                if (Math.abs(result) > 1e12 || (Math.abs(result) < 1e-6 && result !== 0)) {
+                    resultStr = result.toExponential(3);
+                }
+                display.innerText = resultStr;
+                window.calcCompleted = true;
+            } catch {
+                display.innerText = '错误';
+                window.calcCompleted = true;
+            }
+        }
+
+        // 键盘支持保留，不改动界面
+        document.addEventListener('keydown', function(e) {
+            const key = e.key;
+            if (/[0-9.]/.test(key)) {
+                input(key);
+                return;
+            }
+            switch (key) {
+                case '+': input('+'); break;
+                case '-': input('−'); break;
+                case '*': input('×'); break;
+                case '/': input('÷'); break;
+                case '(': input('('); break;
+                case ')': input(')'); break;
+                case 'Enter': e.preventDefault(); calculate(); break;
+                case 'Backspace': deleteLast(); break;
+                case 'Escape': clearDisplay(); break;
+            }
+        });
+    </script>
+</body>
+
+</html>

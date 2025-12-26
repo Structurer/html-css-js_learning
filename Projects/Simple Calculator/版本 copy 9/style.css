@@ -1,0 +1,195 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Microsoft Yahei", Arial, Helvetica, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px 0;
+}
+
+/* 整体主容器：计算器+历史记录 左右布局 */
+.calc-wrap {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  background-color: #fff;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* 计算器核心容器（含切换标签） */
+.calc-main {
+  width: 420px;
+}
+
+/* 标准/科学计算器 切换标签 */
+.calc-tab {
+  display: flex;
+  margin-bottom: 15px;
+  gap: 8px;
+}
+.calc-tab button {
+  flex: 1;
+  padding: 10px 0;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background-color: #f5f5f5;
+  color: #333;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+.calc-tab .tab-active {
+  background-color: #2196f3;
+  color: #fff;
+}
+.calc-tab button:hover:not(.tab-active) {
+  background-color: #e9ecef;
+}
+
+/* 计算器通用样式：默认隐藏，show-calc 显示 */
+.calculator {
+  display: none;
+  gap: 10px;
+}
+.show-calc {
+  display: block;
+}
+
+/* 显示框通用样式（标准+科学计算器共用样式） */
+.calc-display {
+  width: 100%;
+  height: 70px;
+  padding: 0 15px;
+  font-size: 28px;
+  text-align: right;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  background-color: #fafafa;
+  color: #212121;
+  outline: none;
+  cursor: default;
+}
+
+/* 按钮行通用样式：适配标准+科学计算器按钮排版 */
+.btn-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.btn-row button {
+  flex: 1;
+  height: 50px;
+  font-size: 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background-color: #f5f5f5;
+  color: #333;
+  transition: background-color 0.2s ease;
+}
+.btn-row button:hover {
+  background-color: #e0e0e0;
+}
+
+/* 运算符按钮样式 */
+.btn-operator {
+  background-color: #ff9800 !important;
+  color: #fff !important;
+}
+.btn-operator:hover {
+  background-color: #f57c00 !important;
+}
+
+/* 等号按钮样式：独占视觉重点 */
+.btn-equal {
+  background-color: #f44336 !important;
+  color: #fff !important;
+  flex: 1 !important;
+}
+.btn-equal:hover {
+  background-color: #d32f2f !important;
+}
+
+/* 科学计算器专属按钮样式区分 */
+.btn-sci {
+  background-color: #2196f3 !important;
+  color: #fff !important;
+}
+.btn-sci:hover {
+  background-color: #1976d2 !important;
+}
+
+/* 科学计算器适配：多列按钮自适应，不挤压 */
+.sci-calc {
+  width: 100%;
+}
+.sci-calc .btn-row {
+  flex-wrap: nowrap;
+}
+
+/* 计算历史记录区域 */
+.history-wrap {
+  width: 280px;
+  background-color: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 15px;
+  height: fit-content;
+  min-height: 500px;
+}
+.history-title {
+  font-size: 16px;
+  color: #333;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+.history-content {
+  max-height: 450px;
+  overflow-y: auto;
+  gap: 8px;
+  display: flex;
+  flex-direction: column;
+}
+.history-item {
+  font-size: 14px;
+  color: #424242;
+  padding: 6px 0;
+  border-bottom: 1px dashed #f0f0f0;
+  word-break: break-all;
+}
+/* 历史记录滚动条美化 */
+.history-content::-webkit-scrollbar {
+  width: 4px;
+}
+.history-content::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 2px;
+}
+
+/* 响应式适配：小屏幕自动堆叠，不影响使用 */
+@media (max-width: 768px) {
+  .calc-wrap {
+    flex-direction: column;
+    align-items: center;
+  }
+  .calc-main, .history-wrap {
+    width: 100%;
+    max-width: 420px;
+  }
+  .history-wrap {
+    min-height: 200px;
+  }
+}
